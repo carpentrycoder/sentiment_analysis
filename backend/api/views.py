@@ -5,14 +5,13 @@ from rest_framework.parsers import MultiPartParser, FormParser
 import PyPDF2
 from rest_framework.response import Response
 from rest_framework import status
-from django.http import JsonResponse
 from rest_framework.views import APIView
 
 
 class InputDataListCreate(generics.ListCreateAPIView):
     queryset = InputData.objects.all()
     serializer_class = InputDataSerializer
-    parser_classes = (MultiPartParser, FormParser)  # Handle file uploads
+    parser_classes = (MultiPartParser, FormParser)  # Handles file uploads
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -20,34 +19,35 @@ class InputDataListCreate(generics.ListCreateAPIView):
         if serializer.is_valid():
             instance = serializer.save()
 
-            # Store LinkedIn & GitHub URLs in Session
-            request.session['linkedin'] = instance.linkedin if instance.linkedin else None
-            request.session['github'] = instance.github if instance.github else None
+            # ✅ Store LinkedIn & GitHub in session only if available
+            if instance.linkedin:
+                request.session['linkedin'] = instance.linkedin
+            if instance.github:
+                request.session['github'] = instance.github
 
-            # Extract Resume Text & Store in Database
+            # ✅ Extract and store resume text
             if instance.resume:
                 text = self.extract_text_from_pdf(instance.resume)
-                instance.resume_text = text  # ✅ Save extracted text in DB
+                instance.resume_text = text
                 instance.save()
-
-                request.session['resume_text'] = text  # ✅ Store in session too
+                request.session['resume_text'] = text
                 print("📄 Extracted Resume Text:", text)
 
-            # ✅ **Force session to be saved**
-            request.session.modified = True  
+            # ✅ Save session changes
+            request.session.modified = True
             request.session.save()
 
-            # Debugging: Print stored session data
+            # ✅ Debug: Print stored session data
             print("🟢 Stored in Session:")
+            print("🧾 Session ID:", request.session.session_key)
             print("🔹 LinkedIn:", request.session.get('linkedin'))
             print("🔹 GitHub:", request.session.get('github'))
-            print("🔹 Resume Text:", request.session.get('resume_text'))
+            print("🔹 Resume Text:", request.session.get('resume_text')[:200])
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
-        print("❌ Validation Errors:", serializer.errors)  # Debugging
+        print("❌ Validation Errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 
     def extract_text_from_pdf(self, pdf_file):
         """Extract text from a PDF file"""
@@ -57,7 +57,6 @@ class InputDataListCreate(generics.ListCreateAPIView):
 
             with pdf_file.open('rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
-
                 num_pages = len(pdf_reader.pages)
                 print(f"📄 Total Pages in PDF: {num_pages}")
 
@@ -74,16 +73,17 @@ class InputDataListCreate(generics.ListCreateAPIView):
             print(f"⚠️ Error extracting text: {e}")
 
         return text
-    
+
+
 class SessionDataView(APIView):
     def get(self, request, *args, **kwargs):
         print("🔎 Checking Session Data in GET Request:")
+        print("🧾 Session ID:", request.session.session_key)
         print("🔹 LinkedIn:", request.session.get('linkedin', 'Not available'))
         print("🔹 GitHub:", request.session.get('github', 'Not available'))
-        print("🔹 Resume Text:", request.session.get('resume_text', 'No resume text stored'))
-        print(f"Session Keys: {request.session.keys()}")
-        print(f"Full Session Data: {request.session.items()}")
-
+        print("🔹 Resume Text:", request.session.get('resume_text', 'No resume text stored')[:200])
+        print(f"Session Keys: {list(request.session.keys())}")
+        print(f"Full Session Data: {dict(request.session.items())}")
 
         return Response({
             'linkedin': request.session.get('linkedin', 'Not available'),

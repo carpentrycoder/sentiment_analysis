@@ -38,6 +38,9 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"  # Stores session in DB
 SESSION_COOKIE_AGE = 86400  # 1 day
 SESSION_SAVE_EVERY_REQUEST = True  # Ensures session is saved every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session active even after closing browser
+SESSION_COOKIE_SAMESITE = "Lax"  # or "None" if using HTTPS
+SESSION_COOKIE_SECURE = False    # True if using HTTPS
+SESSION_COOKIE_HTTPONLY = True
 
 
 # Application definition
@@ -56,22 +59,34 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    "django.contrib.sessions.middleware.SessionMiddleware"
+  
 ]
-
-SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
-
+SESSION_COOKIE_SAMESITE = "None"
+SESSION_COOKIE_SECURE = True  # ✅ Only for HTTP / localhost
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
 
 # ✅ Allow requests from your frontend
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Vite Frontend
+]
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
 ]
 
 # ✅ Allow credentials (for session-based authentication)
