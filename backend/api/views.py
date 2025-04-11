@@ -443,3 +443,77 @@ class ResumeMarketValueView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+        
+
+class TopMatchingCompaniesView(APIView):
+    def get(self, request):
+        try:
+            # ✅ Resume Data from Session
+            resume_data = request.session.get("resume_info")
+            if not resume_data:
+                return Response({"error": "Resume data not found in session"}, status=400)
+
+            # ✅ Get previously calculated ML metrics from resume
+            shortlisting_prob = request.session.get("shortlisting", {}).get("shortlisting_probability", 0.75)
+            fit_score = request.session.get("fit_score", 7.5)
+            fit_label = request.session.get("fit_label", 1)
+            predicted_quality_score = resume_data.get("resume_quality_score", 8.0)
+            market_value_score = request.session.get("market_value_score", 85)
+            match_percent = request.session.get("match_percent", 0.7)
+            matched_skills = request.session.get("matched_skills", 7)
+            job_skills = request.session.get("used_skills", resume_data["skills"])
+            cgpa = resume_data.get("cgpa", 7.0)
+
+            # ✅ Experience input via query (or default)
+            experience_years = float(request.query_params.get("experience", 7))
+
+            # ✅ All Features Required for GTE Logic
+            resume_features_for_model = {
+                "shortlisting_probability": shortlisting_prob,
+                "matched_skills_count": matched_skills,
+                "total_job_skills": len(job_skills),
+                "skill_match_percent": match_percent,
+                "cgpa": cgpa,
+                "fit_score": fit_score,
+                "resume_quality_score": predicted_quality_score,
+                "market_value_score": market_value_score,
+                "Experience": experience_years
+            }
+
+            # ✅ Load Dataset
+            dataset_path = os.path.join(os.path.dirname(__file__), "data/company_data_with_email.csv")
+            df = pd.read_csv(dataset_path)
+
+            # ✅ Ensure recommendation and fit_label are binary
+            if df["recommendation"].dtype == object:
+                df["recommendation"] = df["recommendation"].str.lower().map({"yes": 1, "no": 0})
+            if df["fit_label"].dtype == object:
+                df["fit_label"] = df["fit_label"].str.lower().map({"fit": 1, "no fit": 0, "yes": 1, "no": 0})
+
+            # ✅ Convert to numeric for comparison
+            features = list(resume_features_for_model.keys())
+            df[features] = df[features].apply(pd.to_numeric, errors="coerce")
+            df.dropna(subset=features, inplace=True)
+
+            # ✅ Matching Logic (≥ each feature)
+            def calculate_match_score(row):
+                matches = 0
+                for f in features:
+                    if resume_features_for_model[f] >= row[f]:
+                        matches += 1
+                return matches / len(features)
+
+            df["gte_match_score"] = df.apply(calculate_match_score, axis=1)
+            df["gte_match_score"] = df["gte_match_score"].round(2)
+
+            # ✅ Return Top Matches
+            top_matches = df.sort_values("gte_match_score", ascending=False).head(5)
+            result = top_matches[["Company", "Branch", "Role", "Skills", "Experience", "Email", "gte_match_score"]].to_dict(orient="records")
+
+            return Response({
+                "resume_features_used": resume_features_for_model,
+                "top_matching_companies": result
+            })
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)

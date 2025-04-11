@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import InputDataListCreate , SessionDataView,ResumeParsedInfoView,CareerSuggestionsView,ShortlistingPredictionView,ResumeInsightsView,ResumeMarketValueView
+from .views import InputDataListCreate , SessionDataView,ResumeParsedInfoView,CareerSuggestionsView,ShortlistingPredictionView,ResumeInsightsView,ResumeMarketValueView,TopMatchingCompaniesView
 
 urlpatterns = [
    path('data/', InputDataListCreate.as_view(), name='data-list-create'),
@@ -9,5 +9,7 @@ urlpatterns = [
    path("shortlisting-probability/", ShortlistingPredictionView.as_view(), name="shortlisting_probability"),
    path("resume-insights/", ResumeInsightsView.as_view(), name="resume_insights"),
    path("market-value/", ResumeMarketValueView.as_view(), name="market_value"),
+   path("top-matching-companies/", TopMatchingCompaniesView.as_view(), name="top_matching_companies"),
+
 ]
 
