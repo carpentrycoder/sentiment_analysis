@@ -1,0 +1,42 @@
+rate,insight
+0.0,Your resume is empty or unreadable. Please provide complete and clear information.
+0.1,Resume is severely lacking in all areas. Start by adding basic details like education and contact.
+0.2,Insufficient data. Mention your academic background and at least one skill or project.
+0.3,Resume lacks clarity and relevance. Use consistent formatting and relevant keywords.
+0.4,No clear objective or skills listed. Start with a career summary and core competencies.
+0.5,Poor structure and content. Consider using a standard resume template for guidance.
+0.6,Very minimal experience and skills. Add more concrete examples like course projects.
+0.7,Lacks academic details and structure. Include your qualifications and any relevant coursework.
+0.8,Resume is too vague. Specify your role in any mentioned projects or achievements.
+0.9,"Missing technical details. Add tools, technologies, and your contributions to projects."
+1.0,Weak content. Emphasize academic performance and relevant skills for your field.
+1.1,Needs stronger profile summary and more structured formatting.
+1.2,Resume appears generic. Tailor it to specific roles or industries you’re targeting.
+1.3,Too short and lacks depth. Add more substance in terms of accomplishments and impact.
+1.4,Not enough content to judge your potential. Expand on each section clearly.
+1.5,Resume feels rushed. Revisit structure and elaborate on each experience listed.
+1.6,Lacking academic and technical visibility. Highlight achievements and tools used.
+1.7,Consider detailing academic projects or internships to show practical exposure.
+1.8,Your resume is missing measurable outcomes. Use numbers to show your impact.
+1.9,"Too basic. Add relevant tools, certifications, and specific responsibilities."
+2.0,Your resume lacks key skills and academic strength. Consider adding projects and improving clarity.
+2.1,Resume lacks direction. Include a brief career objective and organize better.
+2.2,Consider removing unnecessary fluff and focusing on skill-based accomplishments.
+2.3,Projects are missing or not elaborated. Add more technical depth.
+2.4,Weak presentation. Highlight what sets you apart from others.
+2.5,"Work on structuring your experience clearly, with roles and dates."
+2.6,Mention relevant coursework or research if you're short on experience.
+2.7,Include internships or volunteer work to show initiative and learning.
+2.8,Use bullet points and consistent formatting to improve readability.
+2.9,Resume seems outdated. Use modern templates and update skills section.
+3.0,"Moderate content, but lacks focus. Tailor your resume to specific roles."
+3.1,Improve the professional summary to reflect your strengths clearly.
+3.2,Add impactful titles to sections and ensure alignment across the document.
+3.3,Resume still lacks depth. Include metrics or tools used in each project.
+3.4,Emphasize roles where you demonstrated leadership or teamwork.
+3.5,Resume has potential. Add more results-driven descriptions.
+3.6,Improve layout and add relevant certifications or courses.
+3.7,Missing soft skills and achievements. Try including recognitions or awards.
+3.8,Resume can benefit from a clearer tech stack or tool list.
+3.9,Add more clarity around responsibilities in each project.
+4.0,Resume needs improvement. Try showcasing relevant projects or certifications.
