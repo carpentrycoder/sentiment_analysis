@@ -38,8 +38,8 @@ SESSION_ENGINE = "django.contrib.sessions.backends.db"  # Stores session in DB
 SESSION_COOKIE_AGE = 86400  # 1 day
 SESSION_SAVE_EVERY_REQUEST = True  # Ensures session is saved every request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session active even after closing browser
-
-
+SESSION_COOKIE_SAMESITE = None
+SESSION_COOKIE_SECURE = False
 # Application definition
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -52,7 +52,6 @@ INSTALLED_APPS = [
     'corsheaders',
     'api',
 ]
-
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
