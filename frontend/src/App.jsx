@@ -1,17 +1,16 @@
-import React, { useState } from "react";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import FormComponent from "./components/FormComponent";
-import Results from "./components/Results"; // Import Results component
-import "./App.css";
+import Results from "./components/Results";
 
 function App() {
-    const [result, setResult] = useState(null); // Store fetched results
-
-    return (
-        <div>
-            <FormComponent setResult={setResult} />
-            <Results result={result} /> {/* Pass result to Results */}
-        </div>
-    );
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<FormComponent />} />
+        <Route path="/results" element={<Results />} />
+      </Routes>
+    </Router>
+  );
 }
 
-export default App;
+export default App;
