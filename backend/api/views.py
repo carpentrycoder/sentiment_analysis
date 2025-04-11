@@ -313,64 +313,55 @@ class ResumeInsightsView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
         
-class MarketValueView(APIView):
-    def post(self, request):
+class ResumeMarketValueView(APIView):
+    def get(self, request):
         try:
-            resume_data = request.data.get("resume_data")
-            job_skills = request.data.get("job_skills")
+            resume_data = request.session.get("resume_info")
+            if not resume_data:
+                return Response({"error": "No resume data found in session."}, status=400)
 
-            if not resume_data or not job_skills:
-                return Response({"error": "Missing resume_data or job_skills"}, status=400)
-
-            # --- Step 1: Feature Calculation ---
+            # === Extract Required Data ===
+            job_skills = resume_data["skills"]
             matched_skills = len(set(resume_data["skills"]).intersection(set(job_skills)))
             match_ratio = matched_skills / len(job_skills)
             cgpa = resume_data.get("cgpa", 0.0)
 
-            # Prepare input for fit score + label
-            features_df = pd.DataFrame([{
+            # === Train Fit Score & Label Models ===
+            training = []
+            for i in range(10, 35):
+                entry = {
+                    "matched_skills": i,
+                    "total_skills": 30,
+                    "match_ratio": i / 30,
+                    "cgpa": round(6.0 + (i % 4) * 0.5, 2),
+                    "fit_label": 1 if i > 20 else 0,
+                    "fit_score": round((i / 30) * 10, 2)  # fit_score (0–10)
+                }
+                training.append(entry)
+
+            df_fit = pd.DataFrame(training)
+            X_fit = df_fit[["matched_skills", "total_skills", "match_ratio", "cgpa"]]
+            y_fit_label = df_fit["fit_label"]
+            y_fit_score = df_fit["fit_score"]
+
+            clf = LogisticRegression()
+            reg = RandomForestRegressor()
+            clf.fit(X_fit, y_fit_label)
+            reg.fit(X_fit, y_fit_score)
+
+            # === Prediction for Current Resume ===
+            X_input = pd.DataFrame([{
                 "matched_skills": matched_skills,
                 "total_skills": resume_data["skills_count"],
                 "match_ratio": match_ratio,
                 "cgpa": cgpa
             }])
 
-            # Train temporary classifiers (replace with saved models later)
-            clf_data = []
-            for i in range(10, 31):
-                clf_data.append({
-                    "matched_skills": i,
-                    "total_skills": 30,
-                    "match_ratio": i / 30,
-                    "cgpa": round(6.0 + (i % 4) * 0.5, 2),
-                    "fit_label": 1 if i > 20 else 0,
-                    "fit_score": (i / 30) * 10
-                })
-            df_clf = pd.DataFrame(clf_data)
-            clf = LogisticRegression()
-            reg = LinearRegression()
+            fit_label = int(clf.predict(X_input)[0])
+            fit_score = round(reg.predict(X_input)[0], 2)
 
-            clf.fit(df_clf[["matched_skills", "total_skills", "match_ratio", "cgpa"]], df_clf["fit_label"])
-            reg.fit(df_clf[["matched_skills", "total_skills", "match_ratio", "cgpa"]], df_clf["fit_score"])
-
-            fit_label = int(clf.predict(features_df)[0])
-            fit_score = float(round(reg.predict(features_df)[0], 2))
-
-            # --- Step 2: Full Market Value Prediction Input ---
-            resume_features = {
-                "shortlisting_probability": resume_data.get("shortlisting_probability", 0.7),
-                "matched_skills_count": matched_skills,
-                "total_job_skills": len(job_skills),
-                "skill_match_percent": match_ratio,
-                "cgpa": cgpa,
-                "recommendation": 1 if fit_score >= 5 else 0,
-                "fit_label": fit_label,
-                "fit_score": fit_score,
-                "resume_quality_score": resume_data.get("resume_quality_score", 7.0)
-            }
-
-            # --- Step 3: Load & Train Market Value Model ---
-            csv_path =  ("data/resume_market_value_dataset.csv")
+            # === Load Real Market Value Model ===
+            csv_path = os.path.join(os.path.dirname(__file__), "data/resume_market_value_dataset.csv")
             training_data = pd.read_csv(csv_path)
 
             required_cols = [
@@ -380,22 +371,35 @@ class MarketValueView(APIView):
             ]
             missing = [col for col in required_cols if col not in training_data.columns]
             if missing:
-                return Response({"error": f"Missing columns in CSV: {missing}"}, status=500)
+                return Response({"error": f"Missing required columns in CSV: {missing}"}, status=500)
 
             X_train = training_data.drop("market_value_score", axis=1)
             y_train = training_data["market_value_score"]
 
-            model = RandomForestRegressor(n_estimators=100, random_state=42)
-            model.fit(X_train, y_train)
+            mv_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            mv_model.fit(X_train, y_train)
 
-            # --- Step 4: Prediction & Insights ---
-            input_df = pd.DataFrame([resume_features])
-            predicted_score = int(model.predict(input_df)[0])
+            # === Create Input for Market Value Model ===
+            mv_input = pd.DataFrame([{
+                "shortlisting_probability": request.session.get("shortlisting", {}).get("shortlisting_probability", 0.75),
+                "matched_skills_count": matched_skills,
+                "total_job_skills": len(job_skills),
+                "skill_match_percent": match_ratio,
+                "cgpa": cgpa,
+                "recommendation": 1 if fit_score >= 5 else 0,
+                "fit_label": fit_label,
+                "fit_score": fit_score,
+                "resume_quality_score": resume_data.get("resume_quality_score", 7.0)
+            }])
 
-            perm = permutation_importance(model, X_train, y_train, n_repeats=10, random_state=42)
-            importances = perm.importances_mean
-            top_features = [X_train.columns[i] for i in np.argsort(importances)[::-1][:3]]
+            predicted_score = int(mv_model.predict(mv_input)[0])
 
+            perm_importance = permutation_importance(mv_model, X_train, y_train, n_repeats=10, random_state=42)
+            importances = perm_importance.importances_mean
+            sorted_idx = np.argsort(importances)[::-1]
+            top_features = [X_train.columns[i] for i in sorted_idx[:3]]
+
+            # === Market Value Insights ===
             if predicted_score >= 85:
                 label = "🌟 Excellent Candidate"
                 note = "Top-tier resume. Strong recommendation for hiring loop."
@@ -403,8 +407,8 @@ class MarketValueView(APIView):
                 candidate_advice = "Maintain this quality and focus on upskilling in leadership or niche tools."
             elif predicted_score >= 70:
                 label = "✅ Good Fit"
-                note = "Ready for interview. Consider it for the next round."
-                hr_summary = "Skills and resume strength indicate good job readiness."
+                note = "Ready for interview. Consider for the next round."
+                hr_summary = "Skills and resume strength indicate good job-readiness."
                 candidate_advice = "Continue improving project portfolio and soft skills for top-tier roles."
             elif predicted_score >= 50:
                 label = "⚠️ Average Fit"
@@ -415,27 +419,26 @@ class MarketValueView(APIView):
                 label = "❌ Not Recommended"
                 note = "Low readiness score. Skip unless the role is junior/entry-level."
                 hr_summary = "Skillset or experience does not align with role requirements."
-                candidate_advice = "Consider revising your resume, taking up internships, or certifications."
+                candidate_advice = "Consider revising your resume, taking up internships, or getting certifications."
 
-            breakdown = {
-                "Shortlisting Probability": resume_features["shortlisting_probability"],
-                "Skill Match %": resume_features["skill_match_percent"],
-                "Matched Skills Count": resume_features["matched_skills_count"],
-                "CGPA": resume_features["cgpa"],
-                "Fit Score": resume_features["fit_score"],
-                "Resume Quality Score": resume_features["resume_quality_score"]
-            }
-
+            # === Final Response ===
             return Response({
                 "market_value_score": predicted_score,
+                "fit_score": fit_score,
+                "fit_label": fit_label,
                 "label": label,
                 "note": note,
                 "top_factors": top_features,
-                "score_breakdown": breakdown,
                 "hr_summary": hr_summary,
                 "candidate_advice": candidate_advice,
-                "fit_label": fit_label,
-                "fit_score": fit_score
+                "score_breakdown": {
+                    "Shortlisting Probability": mv_input["shortlisting_probability"][0],
+                    "Skill Match %": match_ratio,
+                    "Matched Skills Count": matched_skills,
+                    "CGPA": cgpa,
+                    "Fit Score": fit_score,
+                    "Resume Quality Score": mv_input["resume_quality_score"][0]
+                }
             })
 
         except Exception as e:
