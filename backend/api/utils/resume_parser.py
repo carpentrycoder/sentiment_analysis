@@ -19,16 +19,16 @@ def basic_resume_parser(text):
         return match.group(0) if match else None
 
     def extract_name(text):
-        lines = text.split("\n")
+        lines = text.strip().split("\n")
         for line in lines:
             if "SUMMARY" in line.upper():
                 return lines[lines.index(line) - 1].strip()
-        return lines[0]  # fallback: return first line
+        return lines[0].strip() if lines else "Name not found"
 
     def extract_education(text):
         edu_keywords = ['university', 'college', 'bachelor', 'master', 'b.tech', 'm.tech', 'cgpa', 'degree']
         lines = text.lower().split("\n")
-        return [line for line in lines if any(k in line for k in edu_keywords)]
+        return [line.strip() for line in lines if any(k in line for k in edu_keywords)]
 
     def extract_cgpa(edu_lines):
         for line in edu_lines:
@@ -37,15 +37,23 @@ def basic_resume_parser(text):
                 return float(match.group(1))
         return None
 
+    def extract_experience(text):
+        # Match formats like: 1 year, 2+ years, 3-years, 4 yrs
+        match = re.search(r'(\d+)[\+ -]?\s*(years?|yrs?)', text.lower())
+        return int(match.group(1)) if match else 0
+
     skills = [kw for kw in keywords if kw.lower() in text.lower()]
     education = extract_education(text)
+    cgpa = extract_cgpa(education)
+    experience = extract_experience(text)
 
     return {
         "name": extract_name(text),
         "email": extract_email(text),
         "phone": extract_phone(text),
         "education": education,
-        "cgpa": extract_cgpa(education),
+        "cgpa": cgpa,
+        "experience": experience,  # ✅ New key added
         "skills": skills,
         "skills_count": len(skills)
     }
