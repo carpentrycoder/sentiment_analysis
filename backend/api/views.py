@@ -9,10 +9,10 @@ from .utils.resume_parser import basic_resume_parser
 import PyPDF2
 import os 
 import pandas as pd 
-from sklearn.inspection import permutation_importance
-from sklearn.linear_model import LogisticRegression, LinearRegression
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
+from sklearn.inspection import permutation_importance
+from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 
 class InputDataListCreate(generics.ListCreateAPIView):
@@ -33,19 +33,16 @@ class InputDataListCreate(generics.ListCreateAPIView):
             # Extract Resume Text & Store in Database
             if instance.resume:
                 text = self.extract_text_from_pdf(instance.resume)
-                instance.resume_text = text
+                instance.resume_text = text  # ✅ Save extracted text in DB
                 instance.save()
 
-                request.session['resume_text'] = text
+                request.session['resume_text'] = text  # ✅ Store in session too
                 print("📄 Extracted Resume Text:", text)
 
-                # ✅ Extract structured data using updated basic parser
+                # ✅ Extract structured data using basic parser
                 parsed_data = basic_resume_parser(text)
                 request.session['resume_info'] = parsed_data
                 print("🧠 Parsed Resume Info:", parsed_data)
-
-                # ✅ Log experience explicitly
-                print("🧳 Experience Extracted:", parsed_data.get("experience", 0), "years")
 
             # ✅ Force session save
             request.session.modified = True
@@ -126,7 +123,7 @@ class CareerSuggestionsView(APIView):
                 threshold = 50
 
             # Load roles CSV
-            csv_path = os.path.join(os.path.dirname(__file__), 'data/generated_roles.csv')
+            csv_path = os.path.join(os.path.dirname(__file__), 'generated_roles.csv')
             roles_df = pd.read_csv(csv_path)
 
             def match_score(user_skills, role_skills):
@@ -316,6 +313,80 @@ class ResumeInsightsView(APIView):
         except Exception as e:
             return Response({"error": str(e)}, status=500)
         
+class TopMatchingCompaniesView(APIView):
+    def get(self, request):
+        try:
+            # ✅ Resume Data from Session
+            resume_data = request.session.get("resume_info")
+            if not resume_data:
+                return Response({"error": "Resume data not found in session"}, status=400)
+
+            # ✅ Extract core features from session
+            shortlisting_prob = request.session.get("shortlisting", {}).get("shortlisting_probability", 0.75)
+            fit_score = request.session.get("fit_score", 7.5)
+            fit_label = request.session.get("fit_label", 1)
+            predicted_quality_score = resume_data.get("resume_quality_score", 8.0)
+            market_value_score = request.session.get("market_value_score", 85)
+            match_percent = request.session.get("match_percent", 0.7)
+            matched_skills = request.session.get("matched_skills", 7)
+            job_skills = request.session.get("used_skills", resume_data.get("skills", []))
+            cgpa = resume_data.get("cgpa", 7.0)
+
+            # ✅ Extract experience from parsed data (or default to 0 for freshers)
+            experience_years = resume_data.get("experience", 0)
+
+            # ✅ Features dictionary used for GTE match logic
+            resume_features_for_model = {
+                "shortlisting_probability": shortlisting_prob,
+                "matched_skills_count": matched_skills,
+                "total_job_skills": len(job_skills),
+                "skill_match_percent": match_percent,
+                "cgpa": cgpa,
+                "fit_score": fit_score,
+                "resume_quality_score": predicted_quality_score,
+                "market_value_score": market_value_score,
+                "Experience": experience_years  # ✅ Now using parsed experience
+            }
+
+            # ✅ Load company dataset
+            dataset_path = os.path.join(os.path.dirname(__file__), "data/company_data_with_email.csv")
+            df = pd.read_csv(dataset_path)
+
+            # ✅ Convert categorical labels if needed
+            if df["recommendation"].dtype == object:
+                df["recommendation"] = df["recommendation"].str.lower().map({"yes": 1, "no": 0})
+            if df["fit_label"].dtype == object:
+                df["fit_label"] = df["fit_label"].str.lower().map({"fit": 1, "no fit": 0, "yes": 1, "no": 0})
+
+            # ✅ Clean numeric features
+            features = list(resume_features_for_model.keys())
+            df[features] = df[features].apply(pd.to_numeric, errors="coerce")
+            df.dropna(subset=features, inplace=True)
+
+            # ✅ ≥ Matching logic
+            def calculate_match_score(row):
+                matches = 0
+                for f in features:
+                    if resume_features_for_model[f] >= row[f]:
+                        matches += 1
+                return matches / len(features)
+
+            df["gte_match_score"] = df.apply(calculate_match_score, axis=1).round(2)
+
+            # ✅ Top matches
+            top_matches = df.sort_values("gte_match_score", ascending=False).head(5)
+            result = top_matches[[
+                "Company", "Branch", "Role", "Skills", "Experience", "Email", "gte_match_score"
+            ]].to_dict(orient="records")
+
+            return Response({
+                "resume_features_used": resume_features_for_model,
+                "top_matching_companies": result
+            })
+
+        except Exception as e:
+            return Response({"error": str(e)}, status=500)
+        
 class ResumeMarketValueView(APIView):
     def get(self, request):
         try:
@@ -442,80 +513,6 @@ class ResumeMarketValueView(APIView):
                     "Fit Score": fit_score,
                     "Resume Quality Score": mv_input["resume_quality_score"][0]
                 }
-            })
-
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
-        
-class TopMatchingCompaniesView(APIView):
-    def get(self, request):
-        try:
-            # ✅ Resume Data from Session
-            resume_data = request.session.get("resume_info")
-            if not resume_data:
-                return Response({"error": "Resume data not found in session"}, status=400)
-
-            # ✅ Extract core features from session
-            shortlisting_prob = request.session.get("shortlisting", {}).get("shortlisting_probability", 0.75)
-            fit_score = request.session.get("fit_score", 7.5)
-            fit_label = request.session.get("fit_label", 1)
-            predicted_quality_score = resume_data.get("resume_quality_score", 8.0)
-            market_value_score = request.session.get("market_value_score", 85)
-            match_percent = request.session.get("match_percent", 0.7)
-            matched_skills = request.session.get("matched_skills", 7)
-            job_skills = request.session.get("used_skills", resume_data.get("skills", []))
-            cgpa = resume_data.get("cgpa", 7.0)
-
-            # ✅ Extract experience from parsed data (or default to 0 for freshers)
-            experience_years = resume_data.get("experience", 0)
-
-            # ✅ Features dictionary used for GTE match logic
-            resume_features_for_model = {
-                "shortlisting_probability": shortlisting_prob,
-                "matched_skills_count": matched_skills,
-                "total_job_skills": len(job_skills),
-                "skill_match_percent": match_percent,
-                "cgpa": cgpa,
-                "fit_score": fit_score,
-                "resume_quality_score": predicted_quality_score,
-                "market_value_score": market_value_score,
-                "Experience": experience_years  # ✅ Now using parsed experience
-            }
-
-            # ✅ Load company dataset
-            dataset_path = os.path.join(os.path.dirname(__file__), "data/company_data_with_email.csv")
-            df = pd.read_csv(dataset_path)
-
-            # ✅ Convert categorical labels if needed
-            if df["recommendation"].dtype == object:
-                df["recommendation"] = df["recommendation"].str.lower().map({"yes": 1, "no": 0})
-            if df["fit_label"].dtype == object:
-                df["fit_label"] = df["fit_label"].str.lower().map({"fit": 1, "no fit": 0, "yes": 1, "no": 0})
-
-            # ✅ Clean numeric features
-            features = list(resume_features_for_model.keys())
-            df[features] = df[features].apply(pd.to_numeric, errors="coerce")
-            df.dropna(subset=features, inplace=True)
-
-            # ✅ ≥ Matching logic
-            def calculate_match_score(row):
-                matches = 0
-                for f in features:
-                    if resume_features_for_model[f] >= row[f]:
-                        matches += 1
-                return matches / len(features)
-
-            df["gte_match_score"] = df.apply(calculate_match_score, axis=1).round(2)
-
-            # ✅ Top matches
-            top_matches = df.sort_values("gte_match_score", ascending=False).head(5)
-            result = top_matches[[
-                "Company", "Branch", "Role", "Skills", "Experience", "Email", "gte_match_score"
-            ]].to_dict(orient="records")
-
-            return Response({
-                "resume_features_used": resume_features_for_model,
-                "top_matching_companies": result
             })
 
         except Exception as e:
