@@ -15,6 +15,9 @@ from sklearn.inspection import permutation_importance
 from sklearn.ensemble import RandomForestRegressor
 import numpy as np
 
+
+
+
 class InputDataListCreate(generics.ListCreateAPIView):
     queryset = InputData.objects.all()
     serializer_class = InputDataSerializer
@@ -79,6 +82,7 @@ class InputDataListCreate(generics.ListCreateAPIView):
         except Exception as e:
             print(f"⚠️ Error extracting text: {e}")
         return text
+    
 
 
 class SessionDataView(APIView):
@@ -101,6 +105,7 @@ class SessionDataView(APIView):
 class ResumeParsedInfoView(APIView):
     def get(self, request, *args, **kwargs):
         resume_info = request.session.get('resume_info', {})
+        print("🔍 Retrieving Resume Info from Session:", resume_info)  # Add debug print
         return Response(resume_info)
 
 
@@ -517,3 +522,20 @@ class ResumeMarketValueView(APIView):
 
         except Exception as e:
             return Response({"error": str(e)}, status=500)
+        
+###################################################################################################################################
+
+from django.shortcuts import render
+from django.views import View
+from django.views.generic import TemplateView
+
+
+#template rendering 
+class UploadFormView(View):
+    def get(self, request):
+        return render(request, 'upload.html')  # points to templates/upload_form.html
+    
+class ResumeInfoPageAPIView(APIView):
+    def get(self, request, *args, **kwargs):
+        return render(request, 'resume_info.html')
+    

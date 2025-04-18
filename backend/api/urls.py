@@ -1,7 +1,12 @@
 from django.urls import path
-from .views import InputDataListCreate , SessionDataView,ResumeParsedInfoView,CareerSuggestionsView,ShortlistingPredictionView,ResumeInsightsView,ResumeMarketValueView,TopMatchingCompaniesView
+from .views import InputDataListCreate , SessionDataView,ResumeParsedInfoView,CareerSuggestionsView,ShortlistingPredictionView,ResumeInsightsView,ResumeMarketValueView,TopMatchingCompaniesView ,UploadFormView,ResumeInfoPageAPIView
 
 urlpatterns = [
+#   Template paths 
+   path('upload/', UploadFormView.as_view(), name='upload-form'),
+   path('resume/', ResumeInfoPageAPIView.as_view(), name='resume_info_page'),
+
+#   API paths
    path('data/', InputDataListCreate.as_view(), name='data-list-create'),
    path("session-data/", SessionDataView.as_view(), name="session-data"),
    path('resume-parsed-info/', ResumeParsedInfoView.as_view(), name='resume_parsed_info'),
