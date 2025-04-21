@@ -6,7 +6,7 @@
 </head>
 <body>
     <h2>Upload Resume</h2>
-    <form method="post" enctype="multipart/form-data" action="{% url 'resume_info_page' %}">
+    <form method="post" enctype="multipart/form-data" action="{% url 'data-list-create' %}">
         {% csrf_token %}
 
         <label for="name">Full Name:</label><br>
@@ -27,8 +27,11 @@
         <label for="resume">Upload Resume (PDF):</label><br>
         <input type="file" name="resume" accept=".pdf"><br><br>
 
-
         <button type="submit">Upload</button>
     </form>
+    <a href="{% url 'resume_info_page' %}">
+        <button type="button">Check Details</button>
+    </a>
+    
 </body>
 </html>
